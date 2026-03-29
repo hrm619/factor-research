@@ -1,0 +1,28 @@
+hypothesis_name: sack_rate_differential
+description: >
+  When a team with an elite pass rush (top quartile sack rate) faces a team
+  with a poor offensive line (bottom quartile sacks allowed rate), the pass-rush
+  team covers at elevated rates. Tests structural matchup mispricing.
+version: "1.0.0"
+metrics:
+  - sack_rate_std
+classification:
+  type: quartile
+  metric: sack_rate_std
+outcome: ats
+filters:
+  seasons: [2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024]
+  game_type: [regular]
+  exclude_week_1: true
+lookback: season_to_date
+time_windows:
+  - label: "2014-2018"
+    seasons: [2014, 2015, 2016, 2017, 2018]
+  - label: "2019-2021"
+    seasons: [2019, 2020, 2021]
+  - label: "2022-2024"
+    seasons: [2022, 2023, 2024]
+min_sample_size: 50
+statistical_test: binomial
+significance_threshold: 0.05
+comparison_buckets: [Q1, Q4]

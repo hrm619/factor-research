@@ -1,0 +1,41 @@
+[project]
+name = "factor-research"
+version = "0.1.0"
+description = "NFL factor research framework for systematic backtesting of game-outcome hypotheses"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "pandas",
+    "numpy",
+    "openpyxl",
+    "requests",
+    "python-dotenv",
+    "sqlalchemy",
+    "alembic",
+    "scipy",
+    "statsmodels",
+    "pyyaml",
+    "beautifulsoup4",
+    "lxml",
+    "click",
+]
+
+[project.scripts]
+factor-research = "backend.research.cli:main"
+factor-ingest = "backend.ingestion.ingest_cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["backend"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "ipykernel",
+]

@@ -1,0 +1,24 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+.env
+
+# Database
+*.db
+*.sqlite
+
+# Research output
+backend/research/results/
+
+# PFR scraper cache
+.pfr_cache/
+
+# Internal spec documents
+factor_research_phase1_spec.docx

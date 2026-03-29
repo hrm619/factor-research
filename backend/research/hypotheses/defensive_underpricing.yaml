@@ -1,0 +1,29 @@
+hypothesis_name: defensive_underpricing
+description: >
+  Teams in the top quartile of points allowed (fewest points, best defense)
+  cover the spread at elevated rates, especially when their offensive rankings
+  are middling. Tests whether the market systematically underprices defense.
+version: "1.0.0"
+metrics:
+  - points_allowed_per_game_std
+  - points_per_game_std
+classification:
+  type: quartile
+  metric: points_allowed_per_game_std
+outcome: ats
+filters:
+  seasons: [2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024]
+  game_type: [regular]
+  exclude_week_1: true
+lookback: season_to_date
+time_windows:
+  - label: "2014-2018"
+    seasons: [2014, 2015, 2016, 2017, 2018]
+  - label: "2019-2021"
+    seasons: [2019, 2020, 2021]
+  - label: "2022-2024"
+    seasons: [2022, 2023, 2024]
+min_sample_size: 50
+statistical_test: binomial
+significance_threshold: 0.05
+comparison_buckets: [Q1, Q4]

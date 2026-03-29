@@ -1,0 +1,29 @@
+hypothesis_name: turnover_margin_mean_reversion
+description: >
+  Teams with extreme positive turnover margins (STD) in the first half of the
+  season see their ATS performance decline in the second half, as turnover luck
+  regresses to the mean. Uses weeks 1-9 for profile, weeks 10-18 for outcomes.
+version: "1.0.0"
+metrics:
+  - turnover_margin_std
+classification:
+  type: quartile
+  metric: turnover_margin_std
+outcome: ats
+filters:
+  seasons: [2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024]
+  game_type: [regular]
+  weeks: [10, 11, 12, 13, 14, 15, 16, 17, 18]
+  exclude_week_1: false
+lookback: season_to_date
+time_windows:
+  - label: "2014-2018"
+    seasons: [2014, 2015, 2016, 2017, 2018]
+  - label: "2019-2021"
+    seasons: [2019, 2020, 2021]
+  - label: "2022-2024"
+    seasons: [2022, 2023, 2024]
+min_sample_size: 50
+statistical_test: binomial
+significance_threshold: 0.05
+comparison_buckets: [Q1, Q4]

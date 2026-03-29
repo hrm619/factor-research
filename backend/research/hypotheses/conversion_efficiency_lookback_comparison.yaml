@@ -1,0 +1,29 @@
+hypothesis_name: conversion_efficiency_lookback_comparison
+description: >
+  Season-to-date third down rate is a better ATS predictor than last-4-games
+  third down rate (or vice versa). Tests whether body-of-work or recent form
+  is more predictive, informing the optimal lookback window.
+version: "1.0.0"
+metrics:
+  - third_down_rate_std
+  - third_down_rate_l4
+classification:
+  type: quartile
+  metric: third_down_rate_std
+outcome: ats
+filters:
+  seasons: [2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024]
+  game_type: [regular]
+  exclude_week_1: true
+lookback: season_to_date
+time_windows:
+  - label: "2014-2018"
+    seasons: [2014, 2015, 2016, 2017, 2018]
+  - label: "2019-2021"
+    seasons: [2019, 2020, 2021]
+  - label: "2022-2024"
+    seasons: [2022, 2023, 2024]
+min_sample_size: 50
+statistical_test: binomial
+significance_threshold: 0.05
+comparison_buckets: [Q1, Q4]

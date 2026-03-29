@@ -1,0 +1,9 @@
+description: Missing the hypothesis_name field
+version: "1.0.0"
+metrics:
+  - third_down_rate_std
+classification:
+  type: quartile
+  metric: third_down_rate_std
+outcome: ats
+lookback: season_to_date

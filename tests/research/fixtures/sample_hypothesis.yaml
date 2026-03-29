@@ -1,0 +1,18 @@
+hypothesis_name: test_hypothesis
+description: A test hypothesis for unit tests
+version: "1.0.0"
+metrics:
+  - third_down_rate_std
+classification:
+  type: quartile
+  metric: third_down_rate_std
+outcome: ats
+filters:
+  seasons: [2023, 2024]
+  game_type: [regular]
+  exclude_week_1: true
+lookback: season_to_date
+min_sample_size: 30
+statistical_test: binomial
+significance_threshold: 0.05
+comparison_buckets: [Q1, Q4]

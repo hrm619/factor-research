@@ -1,0 +1,29 @@
+hypothesis_name: fourth_down_aggressiveness
+description: >
+  Teams with above-average fourth down attempt rates (more aggressive) cover
+  the spread at different rates than conservative teams. Fourth down aggressiveness
+  is a coaching philosophy signal that may extract more expected value.
+version: "1.0.0"
+metrics:
+  - fourth_down_attempts_per_game_std
+  - fourth_down_rate_std
+classification:
+  type: quartile
+  metric: fourth_down_attempts_per_game_std
+outcome: ats
+filters:
+  seasons: [2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024]
+  game_type: [regular]
+  exclude_week_1: true
+lookback: season_to_date
+time_windows:
+  - label: "2014-2018"
+    seasons: [2014, 2015, 2016, 2017, 2018]
+  - label: "2019-2021"
+    seasons: [2019, 2020, 2021]
+  - label: "2022-2024"
+    seasons: [2022, 2023, 2024]
+min_sample_size: 50
+statistical_test: binomial
+significance_threshold: 0.05
+comparison_buckets: [Q1, Q4]

@@ -1,0 +1,31 @@
+hypothesis_name: third_down_rate_meta_shift
+description: >
+  The predictive power of third-down conversion rate for ATS outcomes has
+  changed over time, reflecting shifts in offensive philosophy (rise of RPO,
+  increased fourth-down aggressiveness). This tests whether the factor has
+  evolved across eras.
+version: "1.0.0"
+metrics:
+  - third_down_rate_std
+classification:
+  type: quartile
+  metric: third_down_rate_std
+outcome: ats
+filters:
+  seasons: [2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024]
+  game_type: [regular]
+  exclude_week_1: true
+lookback: season_to_date
+time_windows:
+  - label: "2014-2016"
+    seasons: [2014, 2015, 2016]
+  - label: "2017-2019"
+    seasons: [2017, 2018, 2019]
+  - label: "2020-2022"
+    seasons: [2020, 2021, 2022]
+  - label: "2023-2024"
+    seasons: [2023, 2024]
+min_sample_size: 50
+statistical_test: binomial
+significance_threshold: 0.05
+comparison_buckets: [Q1, Q4]
