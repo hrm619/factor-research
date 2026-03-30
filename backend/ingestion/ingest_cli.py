@@ -7,6 +7,7 @@ import logging
 from datetime import datetime, UTC
 
 import click
+import pandas as pd
 from sqlalchemy import text
 
 from backend.research.db import get_engine, get_session, init_db
@@ -14,8 +15,9 @@ from backend.models.research_models import (
     Game, Team, TeamGameStats, IngestionLog,
     CANONICAL_TEAMS, get_expected_game_count,
 )
-from backend.ingestion.pfr_scraper import PFRScraper
-from backend.ingestion.pfr_parser import parse_schedule_page, parse_game_page
+from backend.ingestion.nflverse_source import (
+    fetch_schedule, fetch_team_stats, aggregate_pbp_stats,
+)
 from backend.ingestion.cleaning import clean_game_data, normalize_team_abbr
 from backend.ingestion.derived_metrics import compute_derived_metrics
 from backend.ingestion.config import SEASONS
@@ -39,22 +41,20 @@ def main(ctx, db_url, verbose):
 
 @main.command()
 @click.option("--season", type=int, default=None, help="Season to ingest (default: all)")
-@click.option("--cache-dir", default=".pfr_cache", help="Directory for cached HTML")
 @click.option("--skip-derived", is_flag=True, help="Skip derived metric computation")
 @click.pass_context
-def ingest(ctx, season, cache_dir, skip_derived):
-    """Ingest game data from Pro Football Reference."""
+def ingest(ctx, season, skip_derived):
+    """Ingest game data from nflverse."""
     engine = get_engine(ctx.obj["db_url"])
     init_db(engine)
 
     # Seed teams
     _seed_teams(engine)
 
-    scraper = PFRScraper(cache_dir=cache_dir)
     seasons = [season] if season else SEASONS
 
     for s in seasons:
-        _ingest_season(engine, scraper, s, skip_derived)
+        _ingest_season(engine, s, skip_derived)
 
 
 @main.command("validate-db")
@@ -93,7 +93,7 @@ def validate_db(ctx):
 @click.option("--season", type=int, default=None, help="Season to recompute (default: all)")
 @click.pass_context
 def recompute_derived(ctx, season):
-    """Recompute derived metrics without re-scraping."""
+    """Recompute derived metrics without re-ingesting."""
     engine = get_engine(ctx.obj["db_url"])
     seasons = [season] if season else SEASONS
 
@@ -102,10 +102,10 @@ def recompute_derived(ctx, season):
         click.echo(f"Season {s}: {rows} derived metric rows computed")
 
 
-def _ingest_season(engine, scraper: PFRScraper, season: int, skip_derived: bool) -> None:
-    """Ingest a single season."""
+def _ingest_season(engine, season: int, skip_derived: bool) -> None:
+    """Ingest a single season from nflverse data."""
     session = get_session(engine)
-    log = IngestionLog(source="pfr", season=season, status="running")
+    log = IngestionLog(source="nflverse", season=season, status="running")
     session.add(log)
     session.commit()
 
@@ -114,27 +114,62 @@ def _ingest_season(engine, scraper: PFRScraper, season: int, skip_derived: bool)
     rows_skipped = 0
 
     try:
-        # Fetch schedule
-        schedule_html = scraper.fetch_season_schedule(season)
-        schedule = parse_schedule_page(schedule_html, season)
-        click.echo(f"Season {season}: found {len(schedule)} games in schedule")
+        # Fetch all data for this season
+        click.echo(f"Season {season}: fetching schedule...")
+        schedule = fetch_schedule([season])
 
-        for game_info in schedule:
-            game_id = game_info["game_id"]
+        click.echo(f"Season {season}: fetching team stats...")
+        team_stats = fetch_team_stats([season])
+
+        click.echo(f"Season {season}: aggregating play-by-play stats...")
+        pbp_stats = aggregate_pbp_stats([season])
+
+        click.echo(f"Season {season}: {len(schedule)} games, processing...")
+
+        # Build lookup: (season, week, team) → merged stats row
+        stats_lookup = _build_stats_lookup(schedule, team_stats, pbp_stats)
+
+        for _, game_row in schedule.iterrows():
+            game_id = game_row["game_id"]
             try:
-                game_html = scraper.fetch_game_page(game_id)
-                parsed = parse_game_page(game_html, game_id)
+                home_team = game_row["home_team"]
+                away_team = game_row["away_team"]
 
-                if parsed is None:
-                    errors.append(f"Failed to parse game {game_id}")
+                home_key = (game_row["season"], game_row["week"], home_team)
+                away_key = (game_row["season"], game_row["week"], away_team)
+
+                home_stats = stats_lookup.get(home_key, {})
+                away_stats = stats_lookup.get(away_key, {})
+
+                if not home_stats or not away_stats:
+                    errors.append(f"Missing stats for game {game_id}")
                     rows_skipped += 1
                     continue
+
+                parsed = {
+                    "game": {
+                        "game_id": game_id,
+                        "week": _to_int(game_row["week"]),
+                        "home_team": home_team,
+                        "away_team": away_team,
+                        "home_score": _to_int(game_row["home_score"]),
+                        "away_score": _to_int(game_row["away_score"]),
+                        "game_date": game_row["game_date"],
+                        "game_type": game_row["game_type"],
+                        "home_spread_close": _to_float(game_row["home_spread_close"]),
+                        "total_close": _to_float(game_row["total_close"]),
+                        "overtime": bool(game_row["overtime"]),
+                    },
+                    "home_stats": home_stats,
+                    "away_stats": away_stats,
+                }
 
                 cleaned = clean_game_data(parsed)
                 _upsert_game(session, cleaned, season)
                 rows_ingested += 1
 
             except Exception as e:
+                session.rollback()
                 errors.append(f"Game {game_id}: {str(e)}")
                 rows_skipped += 1
                 logger.error("Failed to ingest game %s: %s", game_id, e)
@@ -143,6 +178,7 @@ def _ingest_season(engine, scraper: PFRScraper, season: int, skip_derived: bool)
 
         # Compute derived metrics
         if not skip_derived:
+            click.echo(f"Season {season}: computing derived metrics...")
             compute_derived_metrics(engine, season)
 
         log.status = "success" if not errors else "partial"
@@ -162,6 +198,92 @@ def _ingest_season(engine, scraper: PFRScraper, season: int, skip_derived: bool)
         raise
     finally:
         session.close()
+
+
+def _build_stats_lookup(
+    schedule: pd.DataFrame,
+    team_stats: pd.DataFrame,
+    pbp_stats: pd.DataFrame,
+) -> dict[tuple, dict]:
+    """Build a lookup dict: (season, week, team) → stats dict for TeamGameStats.
+
+    Merges team_stats and pbp_stats, then maps to our DB column names.
+    """
+    # Join team_stats with schedule to get game_id
+    # Team stats key: (season, week, team)
+    # PBP stats key: (game_id, team)
+    # We need to bridge them via the schedule.
+
+    # Create a mapping: (season, week, team) → game_id from schedule
+    game_id_map = {}
+    for _, row in schedule.iterrows():
+        game_id_map[(row["season"], row["week"], row["home_team"])] = row["game_id"]
+        game_id_map[(row["season"], row["week"], row["away_team"])] = row["game_id"]
+
+    lookup = {}
+
+    for _, ts_row in team_stats.iterrows():
+        key = (ts_row["season"], ts_row["week"], ts_row["team"])
+        game_id = game_id_map.get(key)
+
+        # Start with team_stats columns
+        stats = {
+            "pass_completions": _to_int(ts_row.get("pass_completions")),
+            "pass_attempts": _to_int(ts_row.get("pass_attempts")),
+            "pass_yards": _to_int(ts_row.get("pass_yards")),
+            "pass_touchdowns": _to_int(ts_row.get("pass_touchdowns")),
+            "interceptions_thrown": _to_int(ts_row.get("interceptions_thrown")),
+            "rush_attempts": _to_int(ts_row.get("rush_attempts")),
+            "rush_yards": _to_int(ts_row.get("rush_yards")),
+            "rush_touchdowns": _to_int(ts_row.get("rush_touchdowns")),
+            "total_yards": _to_int(ts_row.get("total_yards")),
+            "first_downs": _to_int(ts_row.get("first_downs")),
+            "fumbles_lost": _to_int(ts_row.get("fumbles_lost")),
+            "turnovers": _to_int(ts_row.get("turnovers")),
+            "penalties": _to_int(ts_row.get("penalties")),
+            "penalty_yards": _to_int(ts_row.get("penalty_yards")),
+            "sacks": _to_int(ts_row.get("sacks")),
+            "sacks_allowed": _to_int(ts_row.get("sacks_allowed")),
+        }
+
+        # Merge PBP stats if available
+        if game_id is not None and not pbp_stats.empty:
+            pbp_row = pbp_stats[
+                (pbp_stats["game_id"] == game_id) & (pbp_stats["team"] == ts_row["team"])
+            ]
+            if not pbp_row.empty:
+                pbp_row = pbp_row.iloc[0]
+                stats["third_down_conversions"] = _to_int(pbp_row.get("third_down_conversions"))
+                stats["third_down_attempts"] = _to_int(pbp_row.get("third_down_attempts"))
+                stats["fourth_down_conversions"] = _to_int(pbp_row.get("fourth_down_conversions"))
+                stats["fourth_down_attempts"] = _to_int(pbp_row.get("fourth_down_attempts"))
+                stats["red_zone_attempts"] = _to_int(pbp_row.get("red_zone_attempts"))
+                stats["red_zone_touchdowns"] = _to_int(pbp_row.get("red_zone_touchdowns"))
+                stats["time_of_possession"] = _to_int(pbp_row.get("time_of_possession"))
+
+        lookup[key] = stats
+
+    return lookup
+
+
+def _to_int(val) -> int | None:
+    """Convert a value to int, returning None for NaN/None."""
+    if val is None or (isinstance(val, float) and pd.isna(val)):
+        return None
+    try:
+        return int(val)
+    except (ValueError, TypeError):
+        return None
+
+
+def _to_float(val) -> float | None:
+    """Convert a value to float, returning None for NaN/None."""
+    if val is None or (isinstance(val, float) and pd.isna(val)):
+        return None
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return None
 
 
 def _upsert_game(session, cleaned: dict, season: int) -> None:

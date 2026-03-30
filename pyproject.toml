@@ -8,16 +8,15 @@ dependencies = [
     "pandas",
     "numpy",
     "openpyxl",
-    "requests",
     "python-dotenv",
     "sqlalchemy",
     "alembic",
     "scipy",
     "statsmodels",
     "pyyaml",
-    "beautifulsoup4",
-    "lxml",
     "click",
+    "nflreadpy>=0.1.5",
+    "pyarrow>=23.0.1",
 ]
 
 [project.scripts]

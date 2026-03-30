@@ -1,15 +1,16 @@
 """Ingestion configuration constants."""
 
-import os
-
-PFR_BASE_URL = "https://www.pro-football-reference.com"
-
-# Rate limiting
-REQUEST_DELAY = float(os.environ.get("PFR_REQUEST_DELAY", "3.0"))
-MAX_RETRIES = int(os.environ.get("PFR_MAX_RETRIES", "3"))
-
 # Target seasons
 SEASONS = list(range(2014, 2025))  # 2014 through 2024
+
+# nflverse game_type → our DB game_type
+GAME_TYPE_MAP: dict[str, str] = {
+    "REG": "regular",
+    "WC": "wildcard",
+    "DIV": "divisional",
+    "CON": "conference",
+    "SB": "superbowl",
+}
 
 # Stat validation ranges (spec Section 2.7)
 STAT_RANGES = {
@@ -34,6 +35,3 @@ STAT_RANGES = {
     "fumbles_lost": (0, 8),
     "time_of_possession": (0, 3900),  # in seconds, max ~65 min (OT)
 }
-
-# Cache directory for raw HTML
-CACHE_DIR = os.environ.get("PFR_CACHE_DIR", ".pfr_cache")

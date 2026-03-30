@@ -24,7 +24,9 @@ Base = declarative_base()
 
 TEAM_ABBREVIATION_MAP: dict[str, str] = {
     "STL": "LAR",
+    "LA": "LAR",
     "OAK": "LVR",
+    "LV": "LVR",
     "SD": "LAC",
     "SDG": "LAC",
     "GNB": "GB",
