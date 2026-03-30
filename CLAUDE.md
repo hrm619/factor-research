@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-NFL factor research framework for backtesting game-outcome hypotheses against historical data (2014–2024). Tests whether measurable team attributes predict against-the-spread (ATS) performance. Part of the broader fin-arb project.
+NFL factor research framework for backtesting game-outcome hypotheses against historical data (2014-2024). Tests whether measurable team attributes predict against-the-spread (ATS) performance. Part of the broader fin-arb project.
 
 The Phase 1 spec lives in `factor_research_phase1_spec.docx`. Amendments in `SPEC_AMENDMENTS.md` (game count corrections, spread source strategy, FDR correction).
 
@@ -24,7 +24,8 @@ uv run factor-research run-all               # Run all hypotheses in hypotheses/
 uv run factor-research list-metrics          # Print available metrics
 
 # CLI — ingestion
-uv run factor-ingest ingest --season 2024    # Ingest one season from PFR
+uv run factor-ingest ingest --season 2024    # Ingest one season from nflverse
+uv run factor-ingest ingest                  # Ingest all seasons (2014-2024)
 uv run factor-ingest validate-db             # Validate DB row counts
 uv run factor-ingest recompute-derived       # Recompute derived metrics
 ```
@@ -51,13 +52,22 @@ backend/
     hypotheses/                # 10 hypothesis YAML files (H1-H10)
     results/                   # Output (gitignored)
   ingestion/
-    pfr_scraper.py             # PFR HTML fetcher with caching + rate limiting
-    pfr_parser.py              # BeautifulSoup HTML → structured data
+    nflverse_source.py         # nflreadpy data fetching (schedule, team stats, PBP aggregation)
     cleaning.py                # Team abbr normalization, stat range validation
     derived_metrics.py         # STD/L4 metric computation (no look-ahead)
     ingest_cli.py              # Click CLI entry point
-    config.py                  # Constants (PFR URLs, rate limits, stat ranges)
+    config.py                  # Constants (seasons, game type mapping, stat ranges)
 ```
+
+### Data Source
+
+Game data is sourced from [nflverse](https://github.com/nflverse) via the `nflreadpy` Python package. Three data endpoints are used per season:
+
+- **`load_schedules()`** — game scores, spreads, schedule metadata
+- **`load_team_stats()`** — per-team-per-game stats (passing, rushing, penalties, sacks, turnovers, etc.)
+- **`load_pbp()`** — play-by-play data, aggregated for: 3rd/4th down conversions, red zone stats, time of possession
+
+Data is fetched as Polars DataFrames, converted to pandas, then mapped to our SQLAlchemy ORM. nflreadpy caches data in `~/.nflverse/` automatically.
 
 ### Pipeline Flow
 
@@ -74,10 +84,11 @@ Each stage receives only the previous stage's output plus the HypothesisDefiniti
 - **Spread convention**: `home_spread_close` is negative when home is favored. For away teams: `margin_vs_spread = (away_score - home_score) - home_spread_close`.
 - **FDR correction**: Benjamini-Hochberg applied within-hypothesis (measure.py) and cross-hypothesis (report.py).
 - **Quality scoring**: Composite of sample_size (30%) + significance (30%) + effect_size (20%) + consistency (20%). Max 3.0. HIGH >= 2.5, MEDIUM >= 1.8, LOW >= 1.0.
+- **Game ID format**: nflverse format (e.g., `2024_01_KC_BAL`), used as PK in `games` table and FK in `team_game_stats` and `derived_metrics`.
 
 ### Team Abbreviation Normalization
 
-PFR uses non-standard abbreviations. The map in `research_models.py` handles: STL→LAR, OAK→LVR, SD→LAC, GNB→GB, KAN→KC, NWE→NE, NOR→NO, SFO→SF, TAM→TB, HTX→HOU, CLT→IND, RAV→BAL, OTI→TEN, CRD→ARI.
+The map in `research_models.py` normalizes historical and variant abbreviations to canonical form. Key mappings include: STL/LA→LAR, OAK/LV→LVR, SD→LAC, GNB→GB, KAN→KC, NWE→NE, NOR→NO, SFO→SF, TAM→TB, HTX→HOU, CLT→IND, RAV→BAL, OTI→TEN, CRD→ARI.
 
 ## Code Conventions
 
