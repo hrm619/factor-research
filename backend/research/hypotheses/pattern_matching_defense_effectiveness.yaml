@@ -1,0 +1,25 @@
+hypothesis_name: pattern_matching_defense_effectiveness
+description: Tests whether teams employing pattern-matching defensive systems (quarters
+  coverage, cover 6) are more effective at limiting points against high-performing
+  offensive units compared to teams using traditional static zone coverage.
+version: 1.0.0
+metrics:
+- points_allowed_per_game_std
+classification:
+  type: binary
+  metric: points_allowed_per_game_std
+  threshold: 21.0
+outcome: su
+lookback: season_to_date
+filters:
+  seasons: null
+  weeks: null
+  game_type:
+  - regular
+  exclude_week_1: true
+min_sample_size: 50
+statistical_test: binomial
+significance_threshold: 0.05
+comparison_buckets:
+- low_points_allowed
+- high_points_allowed

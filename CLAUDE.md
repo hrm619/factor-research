@@ -14,7 +14,7 @@ This project uses **uv** for Python dependency management (Python 3.13).
 
 ```bash
 uv sync                                     # Install dependencies
-uv run pytest                                # Run all tests (154 tests)
+uv run pytest                                # Run all tests (170 tests)
 uv run pytest tests/path/to/test.py::test_name  # Run a single test
 
 # CLI — research
@@ -22,6 +22,12 @@ uv run factor-research validate -h path.yaml # Validate a hypothesis YAML
 uv run factor-research run -h path.yaml      # Run one hypothesis pipeline
 uv run factor-research run-all               # Run all hypotheses in hypotheses/
 uv run factor-research list-metrics          # Print available metrics
+
+# CLI — contracts (cross-repo integration)
+uv run factor-research import --contract <path.json>  # Import Contract 1 → generate YAML
+uv run factor-research import --contract <path> --dry-run  # Validate only
+uv run factor-research export-edges                   # Export Contract 2 edge registry
+uv run factor-research export-edges --hypothesis <name>  # Export single hypothesis
 
 # CLI — ingestion
 uv run factor-ingest ingest --season 2024    # Ingest one season from nflverse
@@ -49,7 +55,9 @@ backend/
     statistical.py             # Pure stat functions (binomial, z-test, chi-sq, Wilson CI, Cohen's h, FDR)
     metrics_catalog.py         # Metric registry (16 metrics with definitions)
     cli.py                     # Click CLI entry point
-    hypotheses/                # 10 hypothesis YAML files (H1-H10)
+    contract_import.py         # Contract 1 JSON → hypothesis YAML conversion
+    contract_export.py         # Pipeline results → Contract 2 edge registry JSON
+    hypotheses/                # 10+ hypothesis YAML files
     results/                   # Output (gitignored)
   ingestion/
     nflverse_source.py         # nflreadpy data fetching (schedule, team stats, PBP aggregation)

@@ -96,11 +96,7 @@ def classify_binary(
 ) -> pd.DataFrame:
     """Assign above/below labels based on a threshold applied within-season."""
     result = df.copy()
-
-    def _label_group(group: pd.DataFrame) -> pd.Series:
-        return group[metric].apply(lambda x: "above" if x >= threshold else "below")
-
-    result["bucket"] = result.groupby("season", group_keys=False).apply(_label_group)
+    result["bucket"] = result[metric].apply(lambda x: "above" if x >= threshold else "below")
     return result
 
 

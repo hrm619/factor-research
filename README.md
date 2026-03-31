@@ -22,7 +22,7 @@ uv sync
 ### Verify
 
 ```bash
-uv run pytest                    # 154 tests
+uv run pytest                    # 170 tests
 uv run factor-research --help
 uv run factor-ingest --help
 ```
@@ -106,11 +106,21 @@ YAML -> Define -> Extract -> Classify -> Measure -> Report
 
 Results are written to `backend/research/results/` (gitignored).
 
+### Cross-repo integration (data contracts)
+
+```bash
+# Import a Contract 1 hypothesis from research-assistant
+uv run factor-research import --contract ~/.fin-arb/contracts/hypotheses/name.json
+
+# Export validated edges as Contract 2 for fin-arb
+uv run factor-research export-edges --output ~/.fin-arb/contracts/edges/nfl_edges.json
+```
+
 ---
 
 ## Hypotheses
 
-10 pre-built hypotheses in `backend/research/hypotheses/`:
+10+ hypotheses in `backend/research/hypotheses/` (new ones can be imported via Contract 1):
 
 | File | Factor | Outcome |
 |---|---|---|
@@ -144,7 +154,9 @@ backend/
     statistical.py             # Pure stat functions (binomial, z-test, chi-sq, Wilson CI, Cohen's h, FDR)
     metrics_catalog.py         # Metric registry (16 metrics)
     cli.py                     # Click CLI entry point
-    hypotheses/                # 10 hypothesis YAML files
+    contract_import.py         # Contract 1 JSON -> hypothesis YAML
+    contract_export.py         # Results -> Contract 2 edge registry
+    hypotheses/                # 10+ hypothesis YAML files
     results/                   # Output (gitignored)
   ingestion/
     nflverse_source.py         # nflreadpy data fetching (schedule, team stats, PBP aggregation)
@@ -152,5 +164,5 @@ backend/
     derived_metrics.py         # STD/L4 metric computation (no look-ahead)
     ingest_cli.py              # Click CLI entry point
     config.py                  # Constants (seasons, game type mapping, stat ranges)
-tests/                         # 154 tests mirroring module structure
+tests/                         # 170 tests mirroring module structure
 ```
